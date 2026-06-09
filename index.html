@@ -21,130 +21,196 @@ canvas{position:absolute;inset:0;width:100%;height:100%}
 </head>
 <body>
 <canvas id="c"></canvas>
+
 <div id="overlay">
 <div id="now"></div>
 <div id="time"></div>
 <div id="until">until bedtime</div>
 <div id="percent"></div>
 </div>
+
 <div id="ruler"></div>
+
 <script>
-const canvas=document.getElementById("c"),ctx=canvas.getContext("2d");
-function resize(){canvas.width=innerWidth;canvas.height=innerHeight}
-resize();addEventListener("resize",resize);
+const canvas=document.getElementById("c");
+const ctx=canvas.getContext("2d");
+
+function resize(){
+ canvas.width=innerWidth;
+ canvas.height=innerHeight;
+}
+resize();
+addEventListener("resize",resize);
+
+let dayStartHour=parseFloat(localStorage.getItem("dayStartHour"))||8;
+let dayEndHour=parseFloat(localStorage.getItem("dayEndHour"))||23;
+
 let t=0;
 
+document.body.addEventListener("click",()=>{
+ const start=prompt("Day start time (24h format)",dayStartHour);
+ if(start===null)return;
+
+ const end=prompt("Day end time (24h format)",dayEndHour);
+ if(end===null)return;
+
+ dayStartHour=parseFloat(start);
+ dayEndHour=parseFloat(end);
+
+ localStorage.setItem("dayStartHour",dayStartHour);
+ localStorage.setItem("dayEndHour",dayEndHour);
+
+ update();
+});
+
 function drawWater(level){
-const w=canvas.width,h=canvas.height;
-ctx.clearRect(0,0,w,h);
+ const w=canvas.width,h=canvas.height;
 
-let bg=ctx.createLinearGradient(0,0,0,h);
-bg.addColorStop(0,"#000");
-bg.addColorStop(.5,"#010405");
-bg.addColorStop(1,"#001112");
-ctx.fillStyle=bg;ctx.fillRect(0,0,w,h);
+ ctx.clearRect(0,0,w,h);
 
-const baseY=h*(0.25+(1-level)*0.65);
+ const bg=ctx.createLinearGradient(0,0,0,h);
+ bg.addColorStop(0,"#000");
+ bg.addColorStop(.5,"#010405");
+ bg.addColorStop(1,"#001112");
+ ctx.fillStyle=bg;
+ ctx.fillRect(0,0,w,h);
 
-ctx.beginPath();
-for(let x=0;x<=w;x+=3){
- let y=baseY+Math.sin(x*0.009+t)*11+Math.sin(x*0.018-t*1.3)*4;
- if(x===0)ctx.moveTo(x,y); else ctx.lineTo(x,y);
-}
-ctx.lineTo(w,h);ctx.lineTo(0,h);ctx.closePath();
+ const baseY=h*(0.25+(1-level)*0.65);
 
-let water=ctx.createLinearGradient(0,baseY-100,0,h);
-water.addColorStop(0.00,"rgb(215,255,248)");
-water.addColorStop(0.06,"rgb(190,245,235)");
-water.addColorStop(0.18,"rgb(38,165,140)");
-water.addColorStop(0.45,"rgb(3,169,141)");
-water.addColorStop(0.75,"rgb(1,120,102)");
-water.addColorStop(1.00,"rgb(1,71,66)");
-ctx.fillStyle=water;
-ctx.fill();
-
-ctx.save();
-ctx.clip();
-
-let glow=ctx.createLinearGradient(0,baseY,0,baseY+380);
-glow.addColorStop(0,"rgba(255,255,255,.40)");
-glow.addColorStop(.08,"rgba(190,255,248,.30)");
-glow.addColorStop(.25,"rgba(90,220,200,.18)");
-glow.addColorStop(1,"rgba(0,0,0,0)");
-ctx.fillStyle=glow;
-ctx.fillRect(0,baseY-20,w,420);
-
-for(let i=0;i<120;i++){
- const px=(i*137+t*8)%w;
- const py=baseY+((i*97)%(h-baseY));
  ctx.beginPath();
- ctx.arc(px,py,.8,0,Math.PI*2);
- ctx.fillStyle="rgba(255,255,255,.05)";
+ for(let x=0;x<=w;x+=3){
+  const y=baseY+Math.sin(x*0.009+t)*11+Math.sin(x*0.018-t*1.3)*4;
+  if(x===0)ctx.moveTo(x,y);
+  else ctx.lineTo(x,y);
+ }
+ ctx.lineTo(w,h);
+ ctx.lineTo(0,h);
+ ctx.closePath();
+
+ const water=ctx.createLinearGradient(0,baseY-100,0,h);
+ water.addColorStop(0.00,"rgb(228,255,250)");
+ water.addColorStop(0.06,"rgb(205,250,240)");
+ water.addColorStop(0.18,"rgb(48,182,156)");
+ water.addColorStop(0.45,"rgb(10,182,153)");
+ water.addColorStop(0.75,"rgb(3,132,112)");
+ water.addColorStop(1.00,"rgb(1,78,72)");
+ ctx.fillStyle=water;
  ctx.fill();
-}
 
-ctx.restore();
+ ctx.save();
+ ctx.clip();
 
-ctx.beginPath();
-for(let x=0;x<=w;x+=2){
- let y=baseY+Math.sin(x*0.009+t)*11+Math.sin(x*0.018-t*1.3)*4;
- if(x===0)ctx.moveTo(x,y); else ctx.lineTo(x,y);
-}
-ctx.strokeStyle="rgba(245,255,250,.95)";
-ctx.lineWidth=2.2;
-ctx.shadowColor="rgba(200,255,245,.55)";
-ctx.shadowBlur=12;
-ctx.stroke();
-ctx.shadowBlur=0;
+ const glow=ctx.createLinearGradient(0,baseY,0,baseY+380);
+ glow.addColorStop(0,"rgba(255,255,255,.48)");
+ glow.addColorStop(.08,"rgba(205,255,248,.36)");
+ glow.addColorStop(.25,"rgba(100,235,215,.22)");
+ glow.addColorStop(1,"rgba(0,0,0,0)");
+ ctx.fillStyle=glow;
+ ctx.fillRect(0,baseY-20,w,420);
 
-t+=0.00375; // 4x slower
+ for(let i=0;i<350;i++){
+   const px=(i*137+t*120+i*0.7)%w;
+   const py=baseY+((i*97+t*40)%(h-baseY));
+   const size=0.2+(((i*17)%100)/100)*1.6;
+   const alpha=0.015+(((i*31)%100)/100)*0.06;
+   ctx.beginPath();
+   ctx.arc(px,py,size,0,Math.PI*2);
+   ctx.fillStyle=`rgba(255,255,255,${alpha})`;
+   ctx.fill();
+ }
+
+ ctx.restore();
+
+ ctx.beginPath();
+ for(let x=0;x<=w;x+=2){
+  const y=baseY+Math.sin(x*0.009+t)*11+Math.sin(x*0.018-t*1.3)*4;
+  if(x===0)ctx.moveTo(x,y);
+  else ctx.lineTo(x,y);
+ }
+
+ ctx.strokeStyle="rgba(245,255,250,.95)";
+ ctx.lineWidth=2.2;
+ ctx.shadowColor="rgba(200,255,245,.55)";
+ ctx.shadowBlur=12;
+ ctx.stroke();
+ ctx.shadowBlur=0;
+
+ t+=0.00375;
 }
 
 function buildRuler(){
-const r=document.getElementById("ruler");
-r.innerHTML="";
-const hours=[15,12,9,6,3,0],h=innerHeight;
+ const r=document.getElementById("ruler");
+ r.innerHTML="";
+ const hours=[15,12,9,6,3,0];
+ const h=innerHeight;
 
-for(let i=0;i<hours.length;i++){
- const y=(i/(hours.length-1))*(h*.75)+h*.12;
- const tick=document.createElement("div");
- tick.className="tick major";
- tick.style.top=y+"px";
- tick.innerHTML=`<div class="label">${hours[i]}h</div><div class="line"></div>`;
- r.appendChild(tick);
+ for(let i=0;i<hours.length;i++){
+  const y=(i/(hours.length-1))*(h*.75)+h*.12;
 
- if(i<hours.length-1){
-  for(let j=1;j<=2;j++){
-   const m=document.createElement("div");
-   m.className="tick";
-   m.style.top=(y+(j/3)*((h*.75)/(hours.length-1)))+"px";
-   m.innerHTML=`<div class="line"></div>`;
-   r.appendChild(m);
+  const tick=document.createElement("div");
+  tick.className="tick major";
+  tick.style.top=y+"px";
+  tick.innerHTML=`<div class="label">${hours[i]}h</div><div class="line"></div>`;
+  r.appendChild(tick);
+
+  if(i<hours.length-1){
+   for(let j=1;j<=2;j++){
+    const m=document.createElement("div");
+    m.className="tick";
+    m.style.top=(y+(j/3)*((h*.75)/(hours.length-1)))+"px";
+    m.innerHTML='<div class="line"></div>';
+    r.appendChild(m);
+   }
   }
  }
 }
-}
 
 function update(){
-const now=new Date();
-const h=now.getHours(),m=now.getMinutes();
-const ampm=h>=12?"PM":"AM";
-const h12=h%12||12;
-document.getElementById("now").innerText=`now ${String(h12).padStart(2,'0')}:${String(m).padStart(2,'0')} ${ampm}`;
+ const now=new Date();
 
-const bedtime=new Date(); bedtime.setHours(23,0,0,0);
-let diff=bedtime-now; if(diff<0) diff+=86400000;
-const hrs=Math.floor(diff/3600000);
-const mins=Math.floor((diff%3600000)/60000);
-document.getElementById("time").innerText=`${hrs}h ${mins}m`;
+ const hour=now.getHours();
+ const minute=now.getMinutes();
+ const ampm=hour>=12?"PM":"AM";
+ const h12=hour%12||12;
 
-const start=new Date(); start.setHours(0,0,0,0);
-const end=new Date(); end.setHours(24,0,0,0);
-const progress=(now-start)/(end-start);
-document.getElementById("percent").innerText=`${Math.round((1-progress)*100)}% of day left`;
-drawWater(progress);
+ document.getElementById("now").innerText=
+   `now ${String(h12).padStart(2,'0')}:${String(minute).padStart(2,'0')} ${ampm}`;
+
+ const bedtime=new Date();
+
+ const endHour=Math.floor(dayEndHour);
+ const endMinutes=Math.round((dayEndHour-endHour)*60);
+
+ bedtime.setHours(endHour,endMinutes,0,0);
+
+ let diff=bedtime-now;
+ if(diff<0)diff=0;
+
+ const hrs=Math.floor(diff/3600000);
+ const mins=Math.floor((diff%3600000)/60000);
+
+ document.getElementById("time").innerText=`${hrs}h ${mins}m`;
+
+ const nowHours=now.getHours()+now.getMinutes()/60;
+ const totalDayHours=dayEndHour-dayStartHour;
+
+ const remainingHours=Math.max(0,dayEndHour-nowHours);
+
+ const remaining=Math.round((remainingHours/totalDayHours)*100);
+
+ document.getElementById("percent").innerText=`${remaining}% of day left`;
+
+ const progress=Math.min(
+ 1,
+ Math.max(0,(nowHours-dayStartHour)/totalDayHours)
+ );
+
+ drawWater(progress);
 }
-buildRuler(); update(); setInterval(update,1000);
+
+buildRuler();
+update();
+setInterval(update,1000);
 </script>
 </body>
 </html>
