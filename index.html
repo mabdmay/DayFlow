@@ -108,13 +108,19 @@ function drawWater(level){
  ctx.fillStyle=glow;
  ctx.fillRect(0,baseY-20,w,420);
 
- for(let i=0;i<350;i++){
-   const px=(i*137+t*120+i*0.7)%w;
-   const py=baseY+((i*97+t*40)%(h-baseY));
-   const size=0.2+(((i*17)%100)/100)*1.6;
-   const alpha=0.015+(((i*31)%100)/100)*0.06;
+ for(let i=0;i<320;i++){
+
+   const px=(i*137+t*850)%w;
+
+   const py=baseY+((i*97+t*280)%(h-baseY));
+
+   const size=0.3+(((i*17)%100)/100)*1.5;
+
+   const alpha=0.02+(((i*31)%100)/100)*0.05;
+
    ctx.beginPath();
    ctx.arc(px,py,size,0,Math.PI*2);
+
    ctx.fillStyle=`rgba(255,255,255,${alpha})`;
    ctx.fill();
  }
@@ -135,7 +141,7 @@ function drawWater(level){
  ctx.stroke();
  ctx.shadowBlur=0;
 
- t+=0.00375;
+ t+=0.0075;
 }
 
 function buildRuler(){
