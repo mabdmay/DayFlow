@@ -11,7 +11,7 @@ canvas{position:absolute;inset:0;width:100%;height:100%}
 #now{font-size:15px;opacity:.72}
 #time{font-family:'Bebas Neue',sans-serif;font-size:78px;line-height:.95;letter-spacing:.5px}
 #until{font-size:16px;opacity:.9}
-#percent{font-size:15px;color:#19e0c1;margin-top:10px}
+#percent{font-size:15px;color:#0a8f7a;font-weight:600;margin-top:10px;text-shadow:0 1px 2px rgba(0,0,0,.35)}
 #ruler{position:absolute;right:12px;top:0;height:100%;width:72px;z-index:20}
 .tick{position:absolute;right:0;display:flex;align-items:center;justify-content:flex-end;gap:8px;font-size:11px;color:rgba(255,255,255,.78)}
 .line{width:10px;height:1px;background:rgba(255,255,255,.35)}
@@ -108,19 +108,13 @@ function drawWater(level){
  ctx.fillStyle=glow;
  ctx.fillRect(0,baseY-20,w,420);
 
- for(let i=0;i<320;i++){
-
-   const px=(i*137+t*850)%w;
-
-   const py=baseY+((i*97+t*280)%(h-baseY));
-
-   const size=0.3+(((i*17)%100)/100)*1.5;
-
-   const alpha=0.02+(((i*31)%100)/100)*0.05;
-
+ for(let i=0;i<520;i++){
+   const px=(i*137+t*1400+i*0.7)%w;
+   const py=baseY+((i*97+t*420)%(h-baseY));
+   const size=0.2+(((i*17)%100)/100)*1.6;
+   const alpha=0.015+(((i*31)%100)/100)*0.06;
    ctx.beginPath();
    ctx.arc(px,py,size,0,Math.PI*2);
-
    ctx.fillStyle=`rgba(255,255,255,${alpha})`;
    ctx.fill();
  }
@@ -141,7 +135,7 @@ function drawWater(level){
  ctx.stroke();
  ctx.shadowBlur=0;
 
- t+=0.0075;
+ t+=0.0225;
 }
 
 function buildRuler(){
@@ -211,7 +205,8 @@ function update(){
  Math.max(0,(nowHours-dayStartHour)/totalDayHours)
  );
 
- drawWater(progress);
+ const waterLevel = 1 - progress;
+ drawWater(waterLevel);
 }
 
 buildRuler();
