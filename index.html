@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>DayFlow Pro</title>
+<title>DayFlow</title>
 
 <style>
 html,body{
@@ -11,85 +11,86 @@ html,body{
     overflow:hidden;
     background:#05070a;
     font-family:-apple-system, system-ui;
+    color:white;
 }
 
-/* glass background */
+/* background */
 #bg{
     position:absolute;
     width:100%;
     height:100%;
-    background:
-      radial-gradient(circle at 20% 20%, rgba(0,255,200,0.08), transparent 40%),
-      radial-gradient(circle at 80% 80%, rgba(0,150,255,0.08), transparent 40%),
-      #05070a;
+    background: radial-gradient(circle at 50% 20%, rgba(0,255,200,0.08), transparent 55%),
+                radial-gradient(circle at 80% 70%, rgba(0,140,255,0.08), transparent 60%),
+                #05070a;
 }
 
-/* glass panel */
-#panel{
+/* center content */
+#center{
     position:absolute;
-    width:85%;
-    height:70%;
-    left:50%;
-    top:50%;
-    transform:translate(-50%,-50%);
-    border-radius:32px;
-
-    background: rgba(255,255,255,0.06);
-    backdrop-filter: blur(25px);
-    -webkit-backdrop-filter: blur(25px);
-
-    border:1px solid rgba(255,255,255,0.08);
-
-    overflow:hidden;
+    width:100%;
+    top:18%;
+    text-align:center;
 }
 
-/* canvas fluid layer */
+#now{
+    font-size:14px;
+    opacity:0.6;
+}
+
+#time{
+    font-size:64px;
+    font-weight:600;
+    letter-spacing:-2px;
+    margin-top:6px;
+}
+
+#until{
+    font-size:14px;
+    opacity:0.7;
+    margin-top:4px;
+}
+
+#percent{
+    font-size:15px;
+    margin-top:10px;
+    color:#2ee6c6;
+    font-weight:500;
+}
+
+/* canvas wave */
 canvas{
     position:absolute;
     width:100%;
     height:100%;
-    bottom:0;
+    left:0;
+    top:0;
 }
 
-/* text overlay */
-#time{
+/* right ruler */
+#ruler{
     position:absolute;
-    top:18%;
-    width:100%;
-    text-align:center;
-    font-size:54px;
-    font-weight:700;
-    color:white;
-    letter-spacing:-1px;
+    right:14px;
+    top:0;
+    height:100%;
+    display:flex;
+    flex-direction:column;
+    justify-content:space-between;
+    padding:80px 0;
+    font-size:12px;
+    opacity:0.7;
 }
 
-#sub{
-    position:absolute;
-    top:28%;
-    width:100%;
-    text-align:center;
-    color:rgba(255,255,255,0.5);
-    font-size:13px;
+.tick{
+    display:flex;
+    align-items:center;
+    gap:6px;
+    justify-content:flex-end;
 }
 
-#hint{
-    position:absolute;
-    bottom:18px;
-    width:100%;
-    text-align:center;
-    font-size:11px;
-    color:rgba(255,255,255,0.25);
-}
-
-/* lock screen vibe line */
-#line{
-    position:absolute;
-    top:42%;
-    left:50%;
-    transform:translateX(-50%);
-    width:60%;
+.line{
+    width:10px;
     height:1px;
-    background:rgba(255,255,255,0.08);
+    background:rgba(255,255,255,0.4);
 }
 </style>
 </head>
@@ -98,55 +99,27 @@ canvas{
 
 <div id="bg"></div>
 
-<div id="panel">
+<canvas id="c"></canvas>
 
-    <canvas id="c"></canvas>
-
+<div id="center">
+    <div id="now">now</div>
     <div id="time">--:--</div>
-    <div id="sub">remaining today</div>
-    <div id="line"></div>
+    <div id="until">until bedtime</div>
+    <div id="percent">--% of day left</div>
+</div>
 
-    <div id="hint">tap to set sleep time</div>
-
+<!-- right scale -->
+<div id="ruler">
+    <div class="tick"><div class="line"></div>15h</div>
+    <div class="tick"><div class="line"></div>12h</div>
+    <div class="tick"><div class="line"></div>9h</div>
+    <div class="tick"><div class="line"></div>6h</div>
+    <div class="tick"><div class="line"></div>3h</div>
+    <div class="tick"><div class="line"></div>0h</div>
 </div>
 
 <script>
 
-/* ===== SETTINGS ===== */
-let END_HOUR = 23;
-let END_MINUTE = 0;
-
-/* load saved */
-const saved = localStorage.getItem("dayflow_end");
-if(saved){
-    const s = JSON.parse(saved);
-    END_HOUR = s.h;
-    END_MINUTE = s.m;
-}
-
-/* tap to set */
-document.body.addEventListener("click", ()=>{
-    navigator.vibrate?.(10);
-
-    let input = prompt("Sleep time (HH:MM)", `${END_HOUR}:${String(END_MINUTE).padStart(2,'0')}`);
-    if(!input) return;
-
-    let p = input.split(":");
-    if(p.length===2){
-        END_HOUR = +p[0];
-        END_MINUTE = +p[1];
-
-        localStorage.setItem("dayflow_end", JSON.stringify({
-            h: END_HOUR,
-            m: END_MINUTE
-        }));
-    }
-});
-
-/* ===== HAPTIC MILESTONES ===== */
-let lastMilestone = -1;
-
-/* ===== CANVAS FLUID ENGINE ===== */
 const canvas = document.getElementById("c");
 const ctx = canvas.getContext("2d");
 
@@ -159,29 +132,33 @@ window.onresize = resize;
 
 let t = 0;
 
-function drawWater(level){
+/* smooth teal gradient wave */
+function drawWave(level){
 
     const w = canvas.width;
     const h = canvas.height;
 
     ctx.clearRect(0,0,w,h);
 
-    const baseY = h * (1 - level);
+    const baseY = h * (0.35 + (1 - level) * 0.55);
 
-    for(let i=0;i<6;i++){
+    // gradient fill
+    let grad = ctx.createLinearGradient(0, baseY, 0, h);
+    grad.addColorStop(0, "rgba(46,230,198,0.9)");
+    grad.addColorStop(1, "rgba(0,90,120,0.2)");
+
+    for(let layer=0; layer<5; layer++){
 
         ctx.beginPath();
+        let alpha = 0.18 - layer*0.03;
+        ctx.fillStyle = grad;
 
-        let alpha = 0.12 - i*0.015;
-
-        ctx.fillStyle = `rgba(0, 255, 200, ${alpha})`;
-
-        for(let x=0;x<w;x+=10){
+        for(let x=0;x<=w;x+=8){
 
             let y =
                 baseY +
-                Math.sin((x*0.01) + t + i)*12 +
-                Math.sin((x*0.02) - t*1.5)*6;
+                Math.sin(x*0.008 + t + layer)*10 +
+                Math.sin(x*0.015 - t*1.2)*6;
 
             if(x===0) ctx.moveTo(x,y);
             else ctx.lineTo(x,y);
@@ -190,54 +167,57 @@ function drawWater(level){
         ctx.lineTo(w,h);
         ctx.lineTo(0,h);
         ctx.closePath();
+        ctx.globalAlpha = alpha;
         ctx.fill();
+        ctx.globalAlpha = 1;
     }
 
-    /* glow edge */
+    // soft top highlight line
     ctx.beginPath();
-    ctx.strokeStyle = "rgba(0,255,220,0.4)";
-    ctx.lineWidth = 2;
+    ctx.strokeStyle = "rgba(255,255,255,0.35)";
+    ctx.lineWidth = 1;
 
-    for(let x=0;x<w;x+=10){
-        let y = baseY + Math.sin(x*0.01 + t)*10;
+    for(let x=0;x<=w;x+=8){
+        let y = baseY + Math.sin(x*0.01 + t)*8;
         if(x===0) ctx.moveTo(x,y);
         else ctx.lineTo(x,y);
     }
     ctx.stroke();
 
-    t += 0.03;
+    t += 0.025;
 }
 
-/* ===== UPDATE LOOP ===== */
+/* main loop */
 function update(){
 
     const now = new Date();
-    const end = new Date();
-    end.setHours(END_HOUR, END_MINUTE, 0, 0);
 
-    let remaining = Math.max(0, end - now);
-
-    let hours = Math.floor(remaining / 3600000);
-    let mins = Math.floor((remaining % 3600000) / 60000);
+    const h = now.getHours();
+    const m = now.getMinutes();
 
     document.getElementById("time").innerText =
-        `${hours}h ${mins}m`;
+        `${h}:${String(m).padStart(2,'0')}`;
 
-    let total = 24*3600000;
-    let level = 1 - (remaining / total);
+    document.getElementById("now").innerText =
+        `now ${h}:${String(m).padStart(2,'0')}`;
 
-    drawWater(level);
+    // DAY PROGRESS (THIS matches your screenshot)
+    const start = new Date();
+    start.setHours(0,0,0,0);
 
-    /* ===== HAPTICS ===== */
-    let milestone = Math.floor(remaining / 3600000);
+    const end = new Date();
+    end.setHours(24,0,0,0);
 
-    if(milestone !== lastMilestone){
-        lastMilestone = milestone;
+    const progress = (now - start) / (end - start);
+    const percent = Math.round(progress * 100);
 
-        if(milestone <= 5 && milestone >= 0){
-            navigator.vibrate?.([30, 50, 30]);
-        }
-    }
+    document.getElementById("percent").innerText =
+        `${percent}% of day left`;
+
+    document.getElementById("until").innerText =
+        `until bedtime`;
+
+    drawWave(progress);
 }
 
 setInterval(update, 1000);
