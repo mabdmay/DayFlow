@@ -4,75 +4,71 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>DayFlow</title>
 
-<!-- UPDATED: Add Bebas Neue -->
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&display=swap" rel="stylesheet">
 
 <style>
+
 html,body{
     margin:0;
     height:100%;
     overflow:hidden;
-    background:#05070a;
-    font-family:-apple-system, system-ui;
+    background:#000;
     color:white;
+    font-family:-apple-system,BlinkMacSystemFont,sans-serif;
 }
 
-/* FULL SCREEN WATER */
 canvas{
     position:absolute;
+    inset:0;
     width:100%;
     height:100%;
-    left:0;
-    top:0;
-    z-index:0;
 }
 
-/* TOP + CENTER TEXT */
 #overlay{
     position:absolute;
     width:100%;
-    top:18%;
+    top:14%;
     text-align:center;
-    z-index:5;
+    z-index:10;
     pointer-events:none;
 }
 
 #now{
-    font-size:14px;
-    opacity:0.6;
-    letter-spacing:0.3px;
+    font-size:18px;
+    font-weight:500;
+    opacity:.78;
+    margin-bottom:6px;
 }
 
 #time{
-    font-size:64px;
-    font-weight:600;
-    letter-spacing:-2px;
-    margin-top:6px;
-
-    /* UPDATED: Bebas Neue font */
-    font-family: 'Bebas Neue', sans-serif;
+    font-family:'Bebas Neue',sans-serif;
+    font-size:96px;
+    line-height:.9;
+    letter-spacing:1px;
+    margin:0;
 }
 
 #until{
-    font-size:16px;
-    opacity:0.85;
-    margin-top:6px;
+    font-size:24px;
+    font-weight:600;
+    opacity:.95;
+    margin-top:8px;
 }
 
 #percent{
-    font-size:15px;
+    font-size:20px;
+    font-weight:600;
+    color:#15e6c8;
     margin-top:10px;
-    color:#2ee6c6;
 }
 
-/* RIGHT SCALE */
 #ruler{
     position:absolute;
-    right:12px;
+    right:14px;
     top:0;
+    width:75px;
     height:100%;
-    width:70px;
-    z-index:10;
+    z-index:20;
 }
 
 .tick{
@@ -81,21 +77,26 @@ canvas{
     display:flex;
     align-items:center;
     justify-content:flex-end;
-    gap:8px;
-    font-size:12px;
-    opacity:0.7;
+    gap:10px;
+    color:white;
+    opacity:.55;
+    font-size:14px;
 }
 
-.line{
-    width:14px;
+.tick .line{
+    width:12px;
     height:1px;
-    background:rgba(255,255,255,0.25);
+    background:rgba(255,255,255,.35);
+}
+
+.major{
+    opacity:.9;
+    font-size:18px;
 }
 
 .major .line{
-    width:26px;
-    background:rgba(255,255,255,0.65);
-    height:1.2px;
+    width:30px;
+    background:rgba(255,255,255,.85);
 }
 
 </style>
@@ -106,10 +107,10 @@ canvas{
 <canvas id="c"></canvas>
 
 <div id="overlay">
-    <div id="now">now</div>
-    <div id="time">--h --m</div>
+    <div id="now">now 03:39 PM</div>
+    <div id="time">8h 21m</div>
     <div id="until">until bedtime</div>
-    <div id="percent">--% of day left</div>
+    <div id="percent">52% of day left</div>
 </div>
 
 <div id="ruler"></div>
@@ -124,11 +125,12 @@ function resize(){
     canvas.height = window.innerHeight;
 }
 resize();
-window.onresize = resize;
+window.addEventListener("resize", resize);
 
 let t = 0;
 
 /* WATER */
+
 function drawWater(level){
 
     const w = canvas.width;
@@ -138,84 +140,154 @@ function drawWater(level){
 
     const baseY = h * (0.25 + (1 - level) * 0.65);
 
-    // UPDATED: Bright teal → deep ocean gradient
-    let grad = ctx.createLinearGradient(0,0,0,h);
-    grad.addColorStop(0, "rgba(0,255,200,0.55)");   // bright teal top
-    grad.addColorStop(0.3, "rgba(0,180,150,0.45)");
-    grad.addColorStop(0.6, "rgba(0,110,100,0.35)");
-    grad.addColorStop(1, "rgba(0,40,50,0.55)");     // deep ocean bottom
+    // Deep black upper background
+    const bg = ctx.createLinearGradient(0,0,0,h);
 
-    for(let layer=0; layer<5; layer++){
+    bg.addColorStop(0,"#000000");
+    bg.addColorStop(0.35,"#010506");
+    bg.addColorStop(1,"#001418");
 
-        ctx.beginPath();
+    ctx.fillStyle = bg;
+    ctx.fillRect(0,0,w,h);
 
-        for(let x=0; x<=w; x+=6){
-
-            let y =
-                baseY +
-                Math.sin(x*0.008 + t*(1 + layer*0.1))*12 +
-                Math.sin(x*0.014 - t*1.2)*6;
-
-            if(x===0) ctx.moveTo(x,y);
-            else ctx.lineTo(x,y);
-        }
-
-        ctx.lineTo(w,h);
-        ctx.lineTo(0,h);
-        ctx.closePath();
-
-        ctx.fillStyle = grad;
-
-        // UPDATED: More luminous layers
-        ctx.globalAlpha = 0.10 + layer*0.07;
-        ctx.fill();
-    }
-
-    // UPDATED: brighter glowing surface line
+    // Water shape
     ctx.beginPath();
-    for(let x=0; x<=w; x+=5){
-        let y = baseY + Math.sin(x*0.01 + t)*6;
+
+    for(let x=0;x<=w;x+=4){
+
+        const y =
+            baseY +
+            Math.sin(x*0.010 + t)*14 +
+            Math.sin(x*0.022 - t*1.4)*5;
+
         if(x===0) ctx.moveTo(x,y);
         else ctx.lineTo(x,y);
     }
 
-    ctx.strokeStyle = "rgba(80,255,230,0.9)";
-    ctx.lineWidth = 1.6;
-    ctx.shadowColor = "rgba(0,255,220,0.6)";
-    ctx.shadowBlur = 8;
+    ctx.lineTo(w,h);
+    ctx.lineTo(0,h);
+    ctx.closePath();
+
+    const water = ctx.createLinearGradient(
+        0,
+        baseY-60,
+        0,
+        h
+    );
+
+    // Bright teal lake/ocean look
+    water.addColorStop(0,"rgba(50,255,225,1)");
+    water.addColorStop(0.10,"rgba(30,245,215,1)");
+    water.addColorStop(0.30,"rgba(0,215,190,1)");
+    water.addColorStop(0.55,"rgba(0,155,145,1)");
+    water.addColorStop(0.80,"rgba(0,85,95,1)");
+    water.addColorStop(1,"rgba(0,30,40,1)");
+
+    ctx.fillStyle = water;
+    ctx.fill();
+
+    // Surface light bloom
+    ctx.save();
+
+    ctx.beginPath();
+
+    for(let x=0;x<=w;x+=4){
+
+        const y =
+            baseY +
+            Math.sin(x*0.010 + t)*14 +
+            Math.sin(x*0.022 - t*1.4)*5;
+
+        if(x===0) ctx.moveTo(x,y);
+        else ctx.lineTo(x,y);
+    }
+
+    ctx.lineTo(w,h);
+    ctx.lineTo(0,h);
+    ctx.closePath();
+
+    ctx.clip();
+
+    const glow = ctx.createLinearGradient(
+        0,
+        baseY-20,
+        0,
+        baseY+350
+    );
+
+    glow.addColorStop(0,"rgba(255,255,255,.38)");
+    glow.addColorStop(.08,"rgba(180,255,245,.45)");
+    glow.addColorStop(.20,"rgba(90,255,230,.28)");
+    glow.addColorStop(1,"rgba(0,0,0,0)");
+
+    ctx.fillStyle = glow;
+    ctx.fillRect(0,baseY-30,w,400);
+
+    ctx.restore();
+
+    // White crest highlight
+    ctx.beginPath();
+
+    for(let x=0;x<=w;x+=3){
+
+        const y =
+            baseY +
+            Math.sin(x*0.010 + t)*14 +
+            Math.sin(x*0.022 - t*1.4)*5;
+
+        if(x===0) ctx.moveTo(x,y);
+        else ctx.lineTo(x,y);
+    }
+
+    ctx.strokeStyle = "rgba(255,255,255,.95)";
+    ctx.lineWidth = 2.5;
+    ctx.shadowColor = "rgba(120,255,240,.95)";
+    ctx.shadowBlur = 18;
     ctx.stroke();
 
     ctx.shadowBlur = 0;
-    ctx.globalAlpha = 1;
-    t += 0.02;
+
+    // Underwater particles
+    for(let i=0;i<120;i++){
+
+        const px = (i * 127.13 + t * 40) % w;
+        const py = baseY + ((i * 91.37) % (h-baseY));
+
+        ctx.beginPath();
+        ctx.arc(px,py,Math.random()*1.2,0,Math.PI*2);
+        ctx.fillStyle = "rgba(255,255,255,.06)";
+        ctx.fill();
+    }
+
+    t += 0.015;
 }
 
 /* RULER */
+
 function buildRuler(){
 
     const ruler = document.getElementById("ruler");
     ruler.innerHTML = "";
 
-    const hours = [15,12,9,6,3,0];
-    const h = window.innerHeight;
+    const labels = [15,12,9,6,3,0];
 
-    for(let i=0;i<hours.length;i++){
+    for(let i=0;i<labels.length;i++){
 
-        const y = (i/(hours.length-1)) * (h*0.75) + h*0.12;
+        const y = 10 + i * 18;
 
-        const tick = document.createElement("div");
-        tick.className = "tick major";
-        tick.style.top = `${y}px`;
-        tick.innerHTML = `<div class="line"></div>${hours[i]}h`;
-        ruler.appendChild(tick);
+        const major = document.createElement("div");
+        major.className = "tick major";
+        major.style.top = `${y}%`;
+        major.innerHTML = `<div class="line"></div>${labels[i]}h`;
+        ruler.appendChild(major);
 
-        if(i < hours.length-1){
-            for(let j=1;j<=2;j++){
-                const ty = y + (j/3)*((h*0.75)/(hours.length-1));
+        if(i < labels.length-1){
+
+            for(let j=1;j<=4;j++){
 
                 const minor = document.createElement("div");
                 minor.className = "tick";
-                minor.style.top = `${ty}px`;
+                minor.style.top = `${y + j*3.6}%`;
                 minor.innerHTML = `<div class="line"></div>`;
                 ruler.appendChild(minor);
             }
@@ -223,56 +295,64 @@ function buildRuler(){
     }
 }
 
-/* MAIN UPDATE */
+buildRuler();
+
+/* CLOCK */
+
 function update(){
 
     const now = new Date();
 
-    // UPDATED: Proper AM/PM formatting
-    const h = now.getHours();
-    const m = now.getMinutes();
+    // Current time
 
-    const ampm = h >= 12 ? "PM" : "AM";
-    const h12 = h % 12 || 12;
+    const hour = now.getHours();
+    const minute = now.getMinutes();
 
-    document.getElementById("now").innerText =
-        `now ${String(h12).padStart(2,'0')}:${String(m).padStart(2,'0')} ${ampm}`;
+    const ampm = hour >= 12 ? "PM" : "AM";
+    const hour12 = hour % 12 || 12;
 
-    // BEDTIME
+    document.getElementById("now").textContent =
+        `now ${String(hour12).padStart(2,"0")}:${String(minute).padStart(2,"0")} ${ampm}`;
+
+    // Bedtime
+
     const bedtime = new Date();
     bedtime.setHours(23,0,0,0);
 
-    let diff = bedtime - now;
-    if(diff < 0) diff += 24*60*60*1000;
+    let remaining = bedtime - now;
 
-    const hrs = Math.floor(diff / 3600000);
-    const mins = Math.floor((diff % 3600000) / 60000);
+    if(remaining < 0){
+        remaining += 24 * 60 * 60 * 1000;
+    }
 
-    document.getElementById("time").innerText =
+    const hrs = Math.floor(remaining / 3600000);
+    const mins = Math.floor((remaining % 3600000) / 60000);
+
+    document.getElementById("time").textContent =
         `${hrs}h ${mins}m`;
 
-    document.getElementById("until").innerText =
-        "until bedtime";
+    // Day left %
 
-    // DAY PROGRESS
     const start = new Date();
     start.setHours(0,0,0,0);
 
     const end = new Date();
     end.setHours(24,0,0,0);
 
-    const progress = (now - start) / (end - start);
-    const percent = Math.round(progress * 100);
+    const progress =
+        (now - start) / (end - start);
 
-    document.getElementById("percent").innerText =
-        `${percent}% of day left`;
+    const dayLeft =
+        Math.round((1 - progress) * 100);
+
+    document.getElementById("percent").textContent =
+        `${dayLeft}% of day left`;
 
     drawWater(progress);
 }
 
-setInterval(update, 1000);
 update();
-buildRuler();
+setInterval(update,1000);
 
 </script>
 
