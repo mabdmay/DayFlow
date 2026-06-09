@@ -32,186 +32,272 @@ canvas{position:absolute;inset:0;width:100%;height:100%}
 <div id="ruler"></div>
 
 <script>
-const canvas=document.getElementById("c");
-const ctx=canvas.getContext("2d");
+const canvas = document.getElementById("c");
+const ctx = canvas.getContext("2d");
 
 function resize(){
- canvas.width=innerWidth;
- canvas.height=innerHeight;
+  canvas.width = innerWidth;
+  canvas.height = innerHeight;
 }
 resize();
-addEventListener("resize",resize);
+addEventListener("resize", resize);
 
-let dayStartHour=parseFloat(localStorage.getItem("dayStartHour"))||8;
-let dayEndHour=parseFloat(localStorage.getItem("dayEndHour"))||23;
+let dayStartHour = parseFloat(localStorage.getItem("dayStartHour")) || 8;
+let dayEndHour   = parseFloat(localStorage.getItem("dayEndHour"))   || 23;
 
-let t=0;
+// --- Animation state ---
+let t = 0;
+let lastFrame = performance.now();
+let waterLevel = 0;
+let targetLevel = 0;
 
-document.body.addEventListener("click",()=>{
- const start=prompt("Day start time (24h format)",dayStartHour);
- if(start===null)return;
+function rand(i, salt){
+  const s = Math.sin(i * 12.9898 + salt * 78.233) * 43758.5453;
+  return s - Math.floor(s);
+}
 
- const end=prompt("Day end time (24h format)",dayEndHour);
- if(end===null)return;
+// --- Particles: stable identity, smooth drift ---
+const N_PARTICLES = 220;
+const particles = [];
+for (let i = 0; i < N_PARTICLES; i++){
+  particles.push({
+    x0:        rand(i, 1),
+    y0:        rand(i, 2),
+    speedX:    (rand(i, 3) - 0.5) * 14,
+    speedY:    -rand(i, 4) * 5 - 1,
+    size:      0.3 + rand(i, 5) * 1.7,
+    alpha:     0.04 + rand(i, 6) * 0.10,
+    bobPhase:  rand(i, 7) * Math.PI * 2,
+    bobSpeed:  0.4 + rand(i, 8) * 0.9
+  });
+}
 
- dayStartHour=parseFloat(start);
- dayEndHour=parseFloat(end);
+// --- Drifting gradient blobs: soft regions of slightly different shade wandering through the water ---
+const N_BLOBS = 4;
+const blobs = [];
+for (let i = 0; i < N_BLOBS; i++){
+  blobs.push({
+    // Each blob's center traces a slow Lissajous-like figure
+    xAmp:     0.3 + rand(i, 21) * 0.25,        // horizontal swing as fraction of width
+    yAmp:     0.25 + rand(i, 22) * 0.3,        // vertical swing as fraction of depth
+    xFreq:    0.018 + rand(i, 23) * 0.022,     // rad/sec — very slow
+    yFreq:    0.014 + rand(i, 24) * 0.020,
+    xPhase:   rand(i, 25) * Math.PI * 2,
+    yPhase:   rand(i, 26) * Math.PI * 2,
+    xCenter:  0.3 + rand(i, 27) * 0.4,         // anchor as fraction of width
+    yCenter:  0.3 + rand(i, 28) * 0.5,         // anchor as fraction of depth
+    radius:   0.45 + rand(i, 29) * 0.35,       // as fraction of width
+    tone:     rand(i, 30)                       // 0..1, picks lighter vs warmer shade
+  });
+}
 
- localStorage.setItem("dayStartHour",dayStartHour);
- localStorage.setItem("dayEndHour",dayEndHour);
+// --- Surface waves: 4 sine layers, slowed 3x ---
+function waveAt(x, baseY, time){
+  const swellPhase = x * 0.0048 + time * 0.183;
+  const swell = Math.sin(swellPhase) + 0.22 * Math.sin(2 * swellPhase);
 
- update();
-});
+  return baseY
+    + swell * 13
+    + Math.sin(x * 0.011  + time * 0.317) * 6.5
+    + Math.sin(x * 0.022  - time * 0.450) * 3.2
+    + Math.sin(x * 0.045  + time * 0.617) * 1.5;
+}
 
-function drawWater(level){
- const w=canvas.width,h=canvas.height;
+function drawScene(){
+  const w = canvas.width, h = canvas.height;
 
- ctx.clearRect(0,0,w,h);
+  // 1. Background
+  ctx.clearRect(0, 0, w, h);
+  const bg = ctx.createLinearGradient(0, 0, 0, h);
+  bg.addColorStop(0,   "#000");
+  bg.addColorStop(0.5, "#010405");
+  bg.addColorStop(1,   "#001112");
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, w, h);
 
- const bg=ctx.createLinearGradient(0,0,0,h);
- bg.addColorStop(0,"#000");
- bg.addColorStop(.5,"#010405");
- bg.addColorStop(1,"#001112");
- ctx.fillStyle=bg;
- ctx.fillRect(0,0,w,h);
+  // 2. Water surface baseline
+  const baseY = h * (0.25 + (1 - waterLevel) * 0.65);
 
- const baseY=h*(0.25+(1-level)*0.65);
+  // 3. Water shape
+  ctx.beginPath();
+  for (let x = 0; x <= w; x += 3){
+    const y = waveAt(x, baseY, t);
+    if (x === 0) ctx.moveTo(x, y);
+    else         ctx.lineTo(x, y);
+  }
+  ctx.lineTo(w, h);
+  ctx.lineTo(0, h);
+  ctx.closePath();
 
- ctx.beginPath();
- for(let x=0;x<=w;x+=3){
-  const y=baseY+Math.sin(x*0.009+t)*11+Math.sin(x*0.018-t*1.3)*4;
-  if(x===0)ctx.moveTo(x,y);
-  else ctx.lineTo(x,y);
- }
- ctx.lineTo(w,h);
- ctx.lineTo(0,h);
- ctx.closePath();
+  // 4. Base water gradient
+  const water = ctx.createLinearGradient(0, baseY - 100, 0, h);
+  water.addColorStop(0.00, "rgb(228,255,250)");
+  water.addColorStop(0.06, "rgb(205,250,240)");
+  water.addColorStop(0.18, "rgb(48,182,156)");
+  water.addColorStop(0.45, "rgb(10,182,153)");
+  water.addColorStop(0.75, "rgb(3,132,112)");
+  water.addColorStop(1.00, "rgb(1,78,72)");
+  ctx.fillStyle = water;
+  ctx.fill();
 
- const water=ctx.createLinearGradient(0,baseY-100,0,h);
- water.addColorStop(0.00,"rgb(228,255,250)");
- water.addColorStop(0.06,"rgb(205,250,240)");
- water.addColorStop(0.18,"rgb(48,182,156)");
- water.addColorStop(0.45,"rgb(10,182,153)");
- water.addColorStop(0.75,"rgb(3,132,112)");
- water.addColorStop(1.00,"rgb(1,78,72)");
- ctx.fillStyle=water;
- ctx.fill();
+  // 5. Effects clipped to the water shape
+  ctx.save();
+  ctx.clip();
 
- ctx.save();
- ctx.clip();
+  // 5a. Soft glow band just below the surface
+  const glow = ctx.createLinearGradient(0, baseY, 0, baseY + 380);
+  glow.addColorStop(0,    "rgba(255,255,255,.36)");
+  glow.addColorStop(0.08, "rgba(205,255,248,.28)");
+  glow.addColorStop(0.25, "rgba(100,235,215,.16)");
+  glow.addColorStop(1,    "rgba(0,0,0,0)");
+  ctx.fillStyle = glow;
+  ctx.fillRect(0, baseY - 20, w, 420);
 
- const glow=ctx.createLinearGradient(0,baseY,0,baseY+380);
- glow.addColorStop(0,"rgba(255,255,255,.48)");
- glow.addColorStop(.08,"rgba(205,255,248,.36)");
- glow.addColorStop(.25,"rgba(100,235,215,.22)");
- glow.addColorStop(1,"rgba(0,0,0,0)");
- ctx.fillStyle=glow;
- ctx.fillRect(0,baseY-20,w,420);
+  // 5b. Drifting gradient blobs — slowly wandering shades of teal
+  const depthRange = h - baseY;
+  ctx.globalCompositeOperation = "screen";
+  for (const b of blobs){
+    const cx = (b.xCenter + Math.sin(t * b.xFreq + b.xPhase) * b.xAmp) * w;
+    const cy = baseY + (b.yCenter + Math.cos(t * b.yFreq + b.yPhase) * b.yAmp) * depthRange;
+    const r  = b.radius * w;
 
- for(let i=0;i<520;i++){
-   const px=(i*137+t*1400+i*0.7)%w;
-   const py=baseY+((i*97+t*420)%(h-baseY));
-   const size=0.2+(((i*17)%100)/100)*1.6;
-   const alpha=0.015+(((i*31)%100)/100)*0.06;
-   ctx.beginPath();
-   ctx.arc(px,py,size,0,Math.PI*2);
-   ctx.fillStyle=`rgba(255,255,255,${alpha})`;
-   ctx.fill();
- }
+    const blobGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
+    if (b.tone > 0.5){
+      // Brighter mint highlight
+      blobGrad.addColorStop(0,    "rgba(190,255,235,0.11)");
+      blobGrad.addColorStop(0.4,  "rgba(120,220,200,0.05)");
+      blobGrad.addColorStop(1,    "rgba(0,0,0,0)");
+    } else {
+      // Warmer, deeper-teal current
+      blobGrad.addColorStop(0,    "rgba(80,210,180,0.10)");
+      blobGrad.addColorStop(0.4,  "rgba(40,170,150,0.04)");
+      blobGrad.addColorStop(1,    "rgba(0,0,0,0)");
+    }
+    ctx.fillStyle = blobGrad;
+    ctx.fillRect(0, baseY - 20, w, h - baseY + 20);
+  }
+  ctx.globalCompositeOperation = "source-over";
 
- ctx.restore();
+  // 5c. Particles
+  for (const p of particles){
+    let px = p.x0 * w + t * p.speedX;
+    px = ((px % w) + w) % w;
 
- ctx.beginPath();
- for(let x=0;x<=w;x+=2){
-  const y=baseY+Math.sin(x*0.009+t)*11+Math.sin(x*0.018-t*1.3)*4;
-  if(x===0)ctx.moveTo(x,y);
-  else ctx.lineTo(x,y);
- }
+    let py = baseY + p.y0 * depthRange + t * p.speedY;
+    py = baseY + ((py - baseY) % depthRange + depthRange) % depthRange;
 
- ctx.strokeStyle="rgba(245,255,250,.95)";
- ctx.lineWidth=2.2;
- ctx.shadowColor="rgba(200,255,245,.55)";
- ctx.shadowBlur=12;
- ctx.stroke();
- ctx.shadowBlur=0;
+    px += Math.cos(t * p.bobSpeed * 0.7 + p.bobPhase) * 1.2;
+    py += Math.sin(t * p.bobSpeed       + p.bobPhase) * 1.5;
 
- t+=0.0225;
+    ctx.beginPath();
+    ctx.arc(px, py, p.size, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(255,255,255,${p.alpha})`;
+    ctx.fill();
+  }
+
+  ctx.restore();
+
+  // 6. Surface highlight line
+  ctx.beginPath();
+  for (let x = 0; x <= w; x += 2){
+    const y = waveAt(x, baseY, t);
+    if (x === 0) ctx.moveTo(x, y);
+    else         ctx.lineTo(x, y);
+  }
+  ctx.strokeStyle = "rgba(245,255,250,.92)";
+  ctx.lineWidth   = 2.2;
+  ctx.shadowColor = "rgba(200,255,245,.55)";
+  ctx.shadowBlur  = 12;
+  ctx.stroke();
+  ctx.shadowBlur  = 0;
+}
+
+function animate(now){
+  const dt = Math.min(0.05, (now - lastFrame) / 1000);
+  lastFrame = now;
+  t += dt;
+
+  waterLevel += (targetLevel - waterLevel) * Math.min(1, dt * 1.4);
+
+  drawScene();
+  requestAnimationFrame(animate);
+}
+
+function updateText(){
+  const now = new Date();
+  const hour = now.getHours();
+  const minute = now.getMinutes();
+  const ampm = hour >= 12 ? "PM" : "AM";
+  const h12 = hour % 12 || 12;
+
+  document.getElementById("now").innerText =
+    `now ${String(h12).padStart(2,'0')}:${String(minute).padStart(2,'0')} ${ampm}`;
+
+  const bedtime   = new Date();
+  const endHour   = Math.floor(dayEndHour);
+  const endMinute = Math.round((dayEndHour - endHour) * 60);
+  bedtime.setHours(endHour, endMinute, 0, 0);
+
+  let diff = bedtime - now;
+  if (diff < 0) diff = 0;
+  const hrs  = Math.floor(diff / 3600000);
+  const mins = Math.floor((diff % 3600000) / 60000);
+  document.getElementById("time").innerText = `${hrs}h ${mins}m`;
+
+  const nowHours       = now.getHours() + now.getMinutes() / 60;
+  const totalDayHours  = dayEndHour - dayStartHour;
+  const remainingHours = Math.max(0, dayEndHour - nowHours);
+  const remaining      = Math.round((remainingHours / totalDayHours) * 100);
+
+  document.getElementById("percent").innerText = `${remaining}% of day left`;
+
+  const progress = Math.min(1, Math.max(0, (nowHours - dayStartHour) / totalDayHours));
+  targetLevel = 1 - progress;
 }
 
 function buildRuler(){
- const r=document.getElementById("ruler");
- r.innerHTML="";
- const hours=[15,12,9,6,3,0];
- const h=innerHeight;
+  const r = document.getElementById("ruler");
+  r.innerHTML = "";
+  const hours = [15, 12, 9, 6, 3, 0];
+  const h = innerHeight;
 
- for(let i=0;i<hours.length;i++){
-  const y=(i/(hours.length-1))*(h*.75)+h*.12;
+  for (let i = 0; i < hours.length; i++){
+    const y = (i / (hours.length - 1)) * (h * 0.75) + h * 0.12;
 
-  const tick=document.createElement("div");
-  tick.className="tick major";
-  tick.style.top=y+"px";
-  tick.innerHTML=`<div class="label">${hours[i]}h</div><div class="line"></div>`;
-  r.appendChild(tick);
+    const tick = document.createElement("div");
+    tick.className = "tick major";
+    tick.style.top = y + "px";
+    tick.innerHTML = `<div class="label">${hours[i]}h</div><div class="line"></div>`;
+    r.appendChild(tick);
 
-  if(i<hours.length-1){
-   for(let j=1;j<=2;j++){
-    const m=document.createElement("div");
-    m.className="tick";
-    m.style.top=(y+(j/3)*((h*.75)/(hours.length-1)))+"px";
-    m.innerHTML='<div class="line"></div>';
-    r.appendChild(m);
-   }
+    if (i < hours.length - 1){
+      for (let j = 1; j <= 2; j++){
+        const m = document.createElement("div");
+        m.className = "tick";
+        m.style.top = (y + (j / 3) * ((h * 0.75) / (hours.length - 1))) + "px";
+        m.innerHTML = '<div class="line"></div>';
+        r.appendChild(m);
+      }
+    }
   }
- }
 }
 
-function update(){
- const now=new Date();
-
- const hour=now.getHours();
- const minute=now.getMinutes();
- const ampm=hour>=12?"PM":"AM";
- const h12=hour%12||12;
-
- document.getElementById("now").innerText=
-   `now ${String(h12).padStart(2,'0')}:${String(minute).padStart(2,'0')} ${ampm}`;
-
- const bedtime=new Date();
-
- const endHour=Math.floor(dayEndHour);
- const endMinutes=Math.round((dayEndHour-endHour)*60);
-
- bedtime.setHours(endHour,endMinutes,0,0);
-
- let diff=bedtime-now;
- if(diff<0)diff=0;
-
- const hrs=Math.floor(diff/3600000);
- const mins=Math.floor((diff%3600000)/60000);
-
- document.getElementById("time").innerText=`${hrs}h ${mins}m`;
-
- const nowHours=now.getHours()+now.getMinutes()/60;
- const totalDayHours=dayEndHour-dayStartHour;
-
- const remainingHours=Math.max(0,dayEndHour-nowHours);
-
- const remaining=Math.round((remainingHours/totalDayHours)*100);
-
- document.getElementById("percent").innerText=`${remaining}% of day left`;
-
- const progress=Math.min(
- 1,
- Math.max(0,(nowHours-dayStartHour)/totalDayHours)
- );
-
- const waterLevel = 1 - progress;
- drawWater(waterLevel);
-}
+document.body.addEventListener("click", () => {
+  const start = prompt("Day start time (24h format)", dayStartHour);
+  if (start === null) return;
+  const end = prompt("Day end time (24h format)", dayEndHour);
+  if (end === null) return;
+  dayStartHour = parseFloat(start);
+  dayEndHour   = parseFloat(end);
+  localStorage.setItem("dayStartHour", dayStartHour);
+  localStorage.setItem("dayEndHour",   dayEndHour);
+  updateText();
+});
 
 buildRuler();
-update();
-setInterval(update,1000);
+updateText();
+setInterval(updateText, 1000);
+requestAnimationFrame(animate);
 </script>
 </body>
 </html>
