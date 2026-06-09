@@ -24,7 +24,7 @@ canvas{
     z-index:0;
 }
 
-/* CENTER OVERLAY */
+/* TOP + CENTER TEXT */
 #overlay{
     position:absolute;
     width:100%;
@@ -59,7 +59,7 @@ canvas{
     color:#2ee6c6;
 }
 
-/* RULER */
+/* RIGHT SCALE */
 #ruler{
     position:absolute;
     right:12px;
@@ -100,8 +100,8 @@ canvas{
 <canvas id="c"></canvas>
 
 <div id="overlay">
-    <div id="now">remaining time</div>
-    <div id="time">-- h -- m</div>
+    <div id="now">now</div>
+    <div id="time">--h --m</div>
     <div id="until">until bedtime</div>
     <div id="percent">--% of day left</div>
 </div>
@@ -122,7 +122,7 @@ window.onresize = resize;
 
 let t = 0;
 
-/* WATER SYSTEM */
+/* WATER */
 function drawWater(level){
 
     const w = canvas.width;
@@ -161,7 +161,7 @@ function drawWater(level){
         ctx.fill();
     }
 
-    // surface line
+    // surface
     ctx.beginPath();
     for(let x=0; x<=w; x+=5){
         let y = baseY + Math.sin(x*0.01 + t)*6;
@@ -177,8 +177,9 @@ function drawWater(level){
     t += 0.02;
 }
 
-/* RULER BUILD */
+/* RULER */
 function buildRuler(){
+
     const ruler = document.getElementById("ruler");
     ruler.innerHTML = "";
 
@@ -214,7 +215,17 @@ function update(){
 
     const now = new Date();
 
-    // BEDTIME 23:00
+    // TOP: CURRENT TIME ONLY
+    const h = now.getHours();
+    const m = now.getMinutes();
+
+    const ampm = h >= 12 ? "pm" : "am";
+    const h12 = h % 12 || 12;
+
+    document.getElementById("now").innerText =
+        `now ${h12}:${String(m).padStart(2,'0')} ${ampm}`;
+
+    // BEDTIME
     const bedtime = new Date();
     bedtime.setHours(23,0,0,0);
 
@@ -224,9 +235,9 @@ function update(){
     const hrs = Math.floor(diff / 3600000);
     const mins = Math.floor((diff % 3600000) / 60000);
 
-    // ONLY CENTER VALUE
+    // CENTER = ONLY TIME REMAINING
     document.getElementById("time").innerText =
-        `${hrs} h ${mins} m`;
+        `${hrs}h ${mins}m`;
 
     document.getElementById("until").innerText =
         "until bedtime";
