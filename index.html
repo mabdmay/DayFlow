@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DayFlow</title>
+
+<style>
+html,body{
+    margin:0;
+    height:100%;
+    overflow:hidden;
+    background:#000;
+    font-family:-apple-system,sans-serif;
+}
+
+#container{
+    position:relative;
+    height:100vh;
+    width:100vw;
+    background:#111;
+}
+
+#water{
+    position:absolute;
+    bottom:0;
+    width:100%;
+    background:linear-gradient(
+        45deg,
+        #00c853,
+        #00bfa5,
+        #00e5ff,
+        #00c853
+    );
+    background-size:400% 400%;
+    animation:gradientMove 20s ease infinite;
+}
+
+#wave{
+    position:absolute;
+    top:-30px;
+    width:200%;
+    height:60px;
+    background:rgba(255,255,255,0.15);
+    border-radius:50%;
+    animation:wave 8s linear infinite;
+}
+
+#time{
+    position:absolute;
+    top:40px;
+    width:100%;
+    text-align:center;
+    color:white;
+    font-size:48px;
+    font-weight:bold;
+}
+
+#subtitle{
+    position:absolute;
+    top:100px;
+    width:100%;
+    text-align:center;
+    color:#aaa;
+}
+
+#scale{
+    position:absolute;
+    right:12px;
+    top:0;
+    height:100%;
+    display:flex;
+    flex-direction:column;
+    justify-content:space-between;
+}
+
+.tick{
+    width:20px;
+    height:2px;
+    background:white;
+    opacity:0.7;
+}
+
+@keyframes gradientMove{
+    0%{background-position:0% 50%;}
+    50%{background-position:100% 50%;}
+    100%{background-position:0% 50%;}
+}
+
+@keyframes wave{
+    from{transform:translateX(0);}
+    to{transform:translateX(-50%);}
+}
+</style>
+</head>
+
+<body>
+
+<div id="container">
+
+<div id="time"></div>
+<div id="subtitle">remaining today</div>
+
+<div id="water">
+    <div id="wave"></div>
+</div>
+
+<div id="scale"></div>
+
+</div>
+
+<script>
+
+const END_HOUR = 23;
+const END_MINUTE = 0;
+
+for(let i=0;i<24;i++){
+    let t=document.createElement("div");
+    t.className="tick";
+    document.getElementById("scale").appendChild(t);
+}
+
+function update(){
+
+    const now = new Date();
+
+    const end = new Date();
+    end.setHours(END_HOUR);
+    end.setMinutes(END_MINUTE);
+    end.setSeconds(0);
+
+    let remaining = Math.max(0,end-now);
+
+    let hours = Math.floor(remaining/3600000);
+    let mins = Math.floor((remaining%3600000)/60000);
+
+    document.getElementById("time").innerHTML=
+        `${hours}h ${mins}m`;
+
+    let fraction = remaining/(24*3600000);
+
+    document.getElementById("water").style.height =
+        `${fraction*100}%`;
+}
+
+update();
+setInterval(update,1000);
+
+</script>
+
+</body>
+</html>
