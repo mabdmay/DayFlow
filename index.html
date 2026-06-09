@@ -14,27 +14,30 @@ html,body{
     color:white;
 }
 
-/* background */
-#bg{
+/* FULL SCREEN WATER BACKGROUND */
+canvas{
     position:absolute;
     width:100%;
     height:100%;
-    background: radial-gradient(circle at 50% 20%, rgba(0,255,200,0.08), transparent 55%),
-                radial-gradient(circle at 80% 70%, rgba(0,140,255,0.08), transparent 60%),
-                #05070a;
+    left:0;
+    top:0;
+    z-index:0;
 }
 
-/* center content */
-#center{
+/* TEXT OVERLAY (NO CARD FEEL) */
+#overlay{
     position:absolute;
     width:100%;
     top:18%;
     text-align:center;
+    z-index:5;
+    pointer-events:none;
 }
 
 #now{
     font-size:14px;
     opacity:0.6;
+    letter-spacing:0.3px;
 }
 
 #time{
@@ -45,78 +48,67 @@ html,body{
 }
 
 #until{
-    font-size:14px;
-    opacity:0.7;
-    margin-top:4px;
+    font-size:16px;
+    opacity:0.85;
+    margin-top:6px;
 }
 
 #percent{
     font-size:15px;
     margin-top:10px;
     color:#2ee6c6;
-    font-weight:500;
 }
 
-/* canvas wave */
-canvas{
-    position:absolute;
-    width:100%;
-    height:100%;
-    left:0;
-    top:0;
-}
-
-/* right ruler */
+/* RIGHT SCALE */
 #ruler{
     position:absolute;
-    right:14px;
+    right:12px;
     top:0;
     height:100%;
+    width:70px;
+    z-index:10;
+}
+
+/* we place ticks absolutely so spacing is PERFECT */
+.tick{
+    position:absolute;
+    right:0;
     display:flex;
-    flex-direction:column;
-    justify-content:space-between;
-    padding:80px 0;
+    align-items:center;
+    justify-content:flex-end;
+    gap:8px;
     font-size:12px;
     opacity:0.7;
 }
 
-.tick{
-    display:flex;
-    align-items:center;
-    gap:6px;
-    justify-content:flex-end;
+.line{
+    width:14px;
+    height:1px;
+    background:rgba(255,255,255,0.25);
 }
 
-.line{
-    width:10px;
-    height:1px;
-    background:rgba(255,255,255,0.4);
+/* major tick */
+.major .line{
+    width:26px;
+    background:rgba(255,255,255,0.65);
+    height:1.2px;
 }
+
 </style>
 </head>
 
 <body>
 
-<div id="bg"></div>
-
 <canvas id="c"></canvas>
 
-<div id="center">
+<div id="overlay">
     <div id="now">now</div>
     <div id="time">--:--</div>
-    <div id="until">until bedtime</div>
+    <div id="until">--h --m until bedtime</div>
     <div id="percent">--% of day left</div>
 </div>
 
-<!-- right scale -->
-<div id="ruler">
-    <div class="tick"><div class="line"></div>15h</div>
-    <div class="tick"><div class="line"></div>12h</div>
-    <div class="tick"><div class="line"></div>9h</div>
-    <div class="tick"><div class="line"></div>6h</div>
-    <div class="tick"><div class="line"></div>3h</div>
-    <div class="tick"><div class="line"></div>0h</div>
-</div>
+<div id="ruler"></div>
 
 <script>
 
@@ -132,33 +124,33 @@ window.onresize = resize;
 
 let t = 0;
 
-/* smooth teal gradient wave */
-function drawWave(level){
+/* FULL DEPTH WATER (3-layer system) */
+function drawWater(level){
 
     const w = canvas.width;
     const h = canvas.height;
 
     ctx.clearRect(0,0,w,h);
 
-    const baseY = h * (0.35 + (1 - level) * 0.55);
+    const baseY = h * (0.25 + (1 - level) * 0.65);
 
-    // gradient fill
-    let grad = ctx.createLinearGradient(0, baseY, 0, h);
-    grad.addColorStop(0, "rgba(46,230,198,0.9)");
-    grad.addColorStop(1, "rgba(0,90,120,0.2)");
+    // deep gradient (top glow → deep ocean)
+    let grad = ctx.createLinearGradient(0,0,0,h);
+    grad.addColorStop(0, "rgba(0,255,210,0.10)");
+    grad.addColorStop(0.4, "rgba(0,140,180,0.20)");
+    grad.addColorStop(1, "rgba(0,20,40,0.55)");
 
+    // MAIN WATER BODY
     for(let layer=0; layer<5; layer++){
 
         ctx.beginPath();
-        let alpha = 0.18 - layer*0.03;
-        ctx.fillStyle = grad;
 
-        for(let x=0;x<=w;x+=8){
+        for(let x=0; x<=w; x+=6){
 
             let y =
                 baseY +
-                Math.sin(x*0.008 + t + layer)*10 +
-                Math.sin(x*0.015 - t*1.2)*6;
+                Math.sin(x*0.008 + t*(1 + layer*0.1))*12 +
+                Math.sin(x*0.014 - t*1.2)*6;
 
             if(x===0) ctx.moveTo(x,y);
             else ctx.lineTo(x,y);
@@ -167,27 +159,64 @@ function drawWave(level){
         ctx.lineTo(w,h);
         ctx.lineTo(0,h);
         ctx.closePath();
-        ctx.globalAlpha = alpha;
+
+        ctx.fillStyle = grad;
+        ctx.globalAlpha = 0.08 + layer*0.05;
         ctx.fill();
-        ctx.globalAlpha = 1;
     }
 
-    // soft top highlight line
+    // SURFACE LINE (sharp liquid boundary)
     ctx.beginPath();
-    ctx.strokeStyle = "rgba(255,255,255,0.35)";
-    ctx.lineWidth = 1;
-
-    for(let x=0;x<=w;x+=8){
-        let y = baseY + Math.sin(x*0.01 + t)*8;
+    for(let x=0; x<=w; x+=5){
+        let y = baseY + Math.sin(x*0.01 + t)*6;
         if(x===0) ctx.moveTo(x,y);
         else ctx.lineTo(x,y);
     }
+
+    ctx.strokeStyle = "rgba(255,255,255,0.45)";
+    ctx.lineWidth = 1.2;
     ctx.stroke();
 
-    t += 0.025;
+    ctx.globalAlpha = 1;
+    t += 0.02;
 }
 
-/* main loop */
+/* RIGHT RULER (perfect spacing) */
+function buildRuler(){
+    const ruler = document.getElementById("ruler");
+    ruler.innerHTML = "";
+
+    const hours = [15,12,9,6,3,0];
+
+    const h = window.innerHeight;
+
+    for(let i=0;i<hours.length;i++){
+
+        const y = (i/(hours.length-1)) * (h*0.75) + h*0.12;
+
+        const tick = document.createElement("div");
+        tick.className = "tick major";
+        tick.style.top = `${y}px`;
+        tick.innerHTML = `<div class="line"></div>${hours[i]}h`;
+
+        ruler.appendChild(tick);
+
+        // add 2 minor ticks between majors
+        if(i < hours.length-1){
+            for(let j=1;j<=2;j++){
+                const ty = y + (j/3)*((h*0.75)/(hours.length-1));
+
+                const minor = document.createElement("div");
+                minor.className = "tick";
+                minor.style.top = `${ty}px`;
+                minor.innerHTML = `<div class="line"></div>`;
+                ruler.appendChild(minor);
+            }
+        }
+    }
+}
+
+/* TIME LOGIC */
 function update(){
 
     const now = new Date();
@@ -195,13 +224,15 @@ function update(){
     const h = now.getHours();
     const m = now.getMinutes();
 
+    const ampm = h >= 12 ? "pm" : "am";
+    const h12 = h % 12 || 12;
+
     document.getElementById("time").innerText =
         `${h}:${String(m).padStart(2,'0')}`;
 
     document.getElementById("now").innerText =
-        `now ${h}:${String(m).padStart(2,'0')}`;
+        `now ${h12}:${String(m).padStart(2,'0')} ${ampm}`;
 
-    // DAY PROGRESS (THIS matches your screenshot)
     const start = new Date();
     start.setHours(0,0,0,0);
 
@@ -214,14 +245,24 @@ function update(){
     document.getElementById("percent").innerText =
         `${percent}% of day left`;
 
-    document.getElementById("until").innerText =
-        `until bedtime`;
+    const bedtime = new Date();
+    bedtime.setHours(23,0,0,0);
 
-    drawWave(progress);
+    let diff = bedtime - now;
+    if(diff < 0) diff += 24*60*60*1000;
+
+    const hrs = Math.floor(diff / 3600000);
+    const mins = Math.floor((diff % 3600000)/60000);
+
+    document.getElementById("until").innerText =
+        `${hrs}h ${mins}m until bedtime`;
+
+    drawWater(progress);
 }
 
 setInterval(update, 1000);
 update();
+buildRuler();
 
 </script>
 
