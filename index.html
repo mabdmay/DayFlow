@@ -4,6 +4,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>DayFlow</title>
 
+<!-- UPDATED: Add Bebas Neue -->
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&display=swap" rel="stylesheet">
+
 <style>
 html,body{
     margin:0;
@@ -45,6 +48,9 @@ canvas{
     font-weight:600;
     letter-spacing:-2px;
     margin-top:6px;
+
+    /* UPDATED: Bebas Neue font */
+    font-family: 'Bebas Neue', sans-serif;
 }
 
 #until{
@@ -132,10 +138,12 @@ function drawWater(level){
 
     const baseY = h * (0.25 + (1 - level) * 0.65);
 
+    // UPDATED: Bright teal → deep ocean gradient
     let grad = ctx.createLinearGradient(0,0,0,h);
-    grad.addColorStop(0, "rgba(0,255,210,0.10)");
-    grad.addColorStop(0.4, "rgba(0,140,180,0.20)");
-    grad.addColorStop(1, "rgba(0,20,40,0.55)");
+    grad.addColorStop(0, "rgba(0,255,200,0.55)");   // bright teal top
+    grad.addColorStop(0.3, "rgba(0,180,150,0.45)");
+    grad.addColorStop(0.6, "rgba(0,110,100,0.35)");
+    grad.addColorStop(1, "rgba(0,40,50,0.55)");     // deep ocean bottom
 
     for(let layer=0; layer<5; layer++){
 
@@ -157,11 +165,13 @@ function drawWater(level){
         ctx.closePath();
 
         ctx.fillStyle = grad;
-        ctx.globalAlpha = 0.08 + layer*0.05;
+
+        // UPDATED: More luminous layers
+        ctx.globalAlpha = 0.10 + layer*0.07;
         ctx.fill();
     }
 
-    // surface
+    // UPDATED: brighter glowing surface line
     ctx.beginPath();
     for(let x=0; x<=w; x+=5){
         let y = baseY + Math.sin(x*0.01 + t)*6;
@@ -169,10 +179,13 @@ function drawWater(level){
         else ctx.lineTo(x,y);
     }
 
-    ctx.strokeStyle = "rgba(255,255,255,0.45)";
-    ctx.lineWidth = 1.2;
+    ctx.strokeStyle = "rgba(80,255,230,0.9)";
+    ctx.lineWidth = 1.6;
+    ctx.shadowColor = "rgba(0,255,220,0.6)";
+    ctx.shadowBlur = 8;
     ctx.stroke();
 
+    ctx.shadowBlur = 0;
     ctx.globalAlpha = 1;
     t += 0.02;
 }
@@ -215,15 +228,15 @@ function update(){
 
     const now = new Date();
 
-    // TOP: CURRENT TIME ONLY
+    // UPDATED: Proper AM/PM formatting
     const h = now.getHours();
     const m = now.getMinutes();
 
-    const ampm = h >= 12 ? "pm" : "am";
+    const ampm = h >= 12 ? "PM" : "AM";
     const h12 = h % 12 || 12;
 
     document.getElementById("now").innerText =
-        `now ${h12}:${String(m).padStart(2,'0')} ${ampm}`;
+        `now ${String(h12).padStart(2,'0')}:${String(m).padStart(2,'0')} ${ampm}`;
 
     // BEDTIME
     const bedtime = new Date();
@@ -235,7 +248,6 @@ function update(){
     const hrs = Math.floor(diff / 3600000);
     const mins = Math.floor((diff % 3600000) / 60000);
 
-    // CENTER = ONLY TIME REMAINING
     document.getElementById("time").innerText =
         `${hrs}h ${mins}m`;
 
