@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>DayFlow</title>
 
 <style>
@@ -9,84 +9,117 @@ html,body{
     margin:0;
     height:100%;
     overflow:hidden;
-    background:#000;
-    font-family:-apple-system,sans-serif;
+    background:#05070a;
+    font-family:-apple-system, system-ui;
 }
 
-#container{
+/* main container */
+#app{
     position:relative;
     height:100vh;
     width:100vw;
-    background:#111;
+    background: radial-gradient(circle at top, #0b1b1f, #05070a);
 }
 
-#water{
+/* water container */
+#waterBox{
     position:absolute;
     bottom:0;
     width:100%;
-    background:linear-gradient(
-        45deg,
-        #00c853,
-        #00bfa5,
-        #00e5ff,
-        #00c853
+    height:100%;
+    overflow:hidden;
+}
+
+/* animated liquid */
+#water{
+    position:absolute;
+    bottom:0;
+    width:200%;
+    height:100%;
+    background: linear-gradient(
+        120deg,
+        #00ff87,
+        #00d4ff,
+        #0099ff,
+        #00ff87
     );
     background-size:400% 400%;
-    animation:gradientMove 20s ease infinite;
+    animation: gradientMove 12s ease infinite;
+    opacity:0.9;
+    transform: translateY(100%);
+    transition: transform 1.2s ease-out;
 }
 
+/* wave overlay */
 #wave{
     position:absolute;
-    top:-30px;
+    top:-40px;
     width:200%;
-    height:60px;
-    background:rgba(255,255,255,0.15);
+    height:80px;
+    background: rgba(255,255,255,0.08);
     border-radius:50%;
-    animation:wave 8s linear infinite;
+    filter: blur(2px);
+    animation: waveMove 6s linear infinite;
 }
 
+/* time text */
 #time{
     position:absolute;
-    top:40px;
+    top:18%;
     width:100%;
     text-align:center;
     color:white;
-    font-size:48px;
-    font-weight:bold;
+    font-size:52px;
+    font-weight:700;
+    letter-spacing:-1px;
 }
 
-#subtitle{
+#label{
     position:absolute;
-    top:100px;
+    top:28%;
     width:100%;
     text-align:center;
-    color:#aaa;
+    color:#8aa0a6;
+    font-size:14px;
 }
 
+/* settings hint */
+#hint{
+    position:absolute;
+    bottom:40px;
+    width:100%;
+    text-align:center;
+    color:#3a5a60;
+    font-size:12px;
+}
+
+/* scale */
 #scale{
     position:absolute;
-    right:12px;
+    right:10px;
     top:0;
     height:100%;
     display:flex;
     flex-direction:column;
     justify-content:space-between;
+    padding:40px 0;
 }
 
 .tick{
-    width:20px;
+    width:14px;
     height:2px;
-    background:white;
-    opacity:0.7;
+    background:#7fffd4;
+    opacity:0.5;
 }
 
+/* animations */
 @keyframes gradientMove{
     0%{background-position:0% 50%;}
     50%{background-position:100% 50%;}
     100%{background-position:0% 50%;}
 }
 
-@keyframes wave{
+@keyframes waveMove{
     from{transform:translateX(0);}
     to{transform:translateX(-50%);}
 }
@@ -95,51 +128,93 @@ html,body{
 
 <body>
 
-<div id="container">
+<div id="app">
 
-<div id="time"></div>
-<div id="subtitle">remaining today</div>
+    <div id="time">--:--</div>
+    <div id="label">remaining today</div>
 
-<div id="water">
-    <div id="wave"></div>
-</div>
+    <div id="waterBox">
+        <div id="water">
+            <div id="wave"></div>
+        </div>
+    </div>
 
-<div id="scale"></div>
+    <div id="scale"></div>
+
+    <div id="hint">Tap screen to set sleep time</div>
 
 </div>
 
 <script>
 
-const END_HOUR = 23;
-const END_MINUTE = 0;
+let END_HOUR = 23;
+let END_MINUTE = 0;
 
+/* load saved time */
+const saved = localStorage.getItem("dayflow_end");
+if(saved){
+    const parts = JSON.parse(saved);
+    END_HOUR = parts.h;
+    END_MINUTE = parts.m;
+}
+
+/* build hour ticks */
 for(let i=0;i<24;i++){
     let t=document.createElement("div");
     t.className="tick";
     document.getElementById("scale").appendChild(t);
 }
 
+/* set sleep time */
+document.body.addEventListener("click", ()=>{
+    let input = prompt("Set end time (HH:MM)", `${END_HOUR}:${String(END_MINUTE).padStart(2,'0')}`);
+    if(!input) return;
+
+    let parts = input.split(":");
+    if(parts.length===2){
+        END_HOUR = parseInt(parts[0]);
+        END_MINUTE = parseInt(parts[1]);
+
+        localStorage.setItem("dayflow_end", JSON.stringify({
+            h: END_HOUR,
+            m: END_MINUTE
+        }));
+    }
+});
+
+let animated = false;
+
 function update(){
 
     const now = new Date();
 
     const end = new Date();
-    end.setHours(END_HOUR);
-    end.setMinutes(END_MINUTE);
-    end.setSeconds(0);
+    end.setHours(END_HOUR, END_MINUTE, 0, 0);
 
-    let remaining = Math.max(0,end-now);
+    let remaining = end - now;
+    if(remaining < 0) remaining = 0;
 
-    let hours = Math.floor(remaining/3600000);
-    let mins = Math.floor((remaining%3600000)/60000);
+    let hours = Math.floor(remaining / 3600000);
+    let mins = Math.floor((remaining % 3600000) / 60000);
 
-    document.getElementById("time").innerHTML=
+    document.getElementById("time").innerText =
         `${hours}h ${mins}m`;
 
-    let fraction = remaining/(24*3600000);
+    /* progress of day (inverse fill) */
+    let total = 24 * 3600000;
+    let fill = 1 - (remaining / total);
 
-    document.getElementById("water").style.height =
-        `${fraction*100}%`;
+    let water = document.getElementById("water");
+
+    /* animate only once on open */
+    if(!animated){
+        setTimeout(()=>{
+            water.style.transform = `translateY(${(1-fill)*100}%)`;
+        },200);
+        animated = true;
+    } else {
+        water.style.transform = `translateY(${(1-fill)*100}%)`;
+    }
 }
 
 update();
