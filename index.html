@@ -35,15 +35,20 @@ canvas{position:absolute;inset:0;width:100%;height:100%}
 const canvas = document.getElementById("c");
 const ctx = canvas.getContext("2d");
 
-function resize(){
-  canvas.width = innerWidth;
-  canvas.height = innerHeight;
-}
-resize();
-addEventListener("resize", resize);
+/* --- Layout constants: ruler and water share the same vertical band --- */
+const RULER_TOP  = 0.12;   // fraction of screen height
+const RULER_SPAN = 0.75;   // fraction of screen height
 
 let dayStartHour = parseFloat(localStorage.getItem("dayStartHour")) || 8;
 let dayEndHour   = parseFloat(localStorage.getItem("dayEndHour"))   || 23;
+
+function resize(){
+  canvas.width = innerWidth;
+  canvas.height = innerHeight;
+  buildRuler();
+}
+resize();
+addEventListener("resize", resize);
 
 // --- Animation state ---
 let t = 0;
@@ -72,26 +77,25 @@ for (let i = 0; i < N_PARTICLES; i++){
   });
 }
 
-// --- Drifting gradient blobs: soft regions of slightly different shade wandering through the water ---
+// --- Drifting gradient blobs ---
 const N_BLOBS = 4;
 const blobs = [];
 for (let i = 0; i < N_BLOBS; i++){
   blobs.push({
-    // Each blob's center traces a slow Lissajous-like figure
-    xAmp:     0.3 + rand(i, 21) * 0.25,        // horizontal swing as fraction of width
-    yAmp:     0.25 + rand(i, 22) * 0.3,        // vertical swing as fraction of depth
-    xFreq:    0.018 + rand(i, 23) * 0.022,     // rad/sec — very slow
+    xAmp:     0.3 + rand(i, 21) * 0.25,
+    yAmp:     0.25 + rand(i, 22) * 0.3,
+    xFreq:    0.018 + rand(i, 23) * 0.022,
     yFreq:    0.014 + rand(i, 24) * 0.020,
     xPhase:   rand(i, 25) * Math.PI * 2,
     yPhase:   rand(i, 26) * Math.PI * 2,
-    xCenter:  0.3 + rand(i, 27) * 0.4,         // anchor as fraction of width
-    yCenter:  0.3 + rand(i, 28) * 0.5,         // anchor as fraction of depth
-    radius:   0.45 + rand(i, 29) * 0.35,       // as fraction of width
-    tone:     rand(i, 30)                       // 0..1, picks lighter vs warmer shade
+    xCenter:  0.3 + rand(i, 27) * 0.4,
+    yCenter:  0.3 + rand(i, 28) * 0.5,
+    radius:   0.45 + rand(i, 29) * 0.35,
+    tone:     rand(i, 30)
   });
 }
 
-// --- Surface waves: 4 sine layers, slowed 3x ---
+// --- Surface waves ---
 function waveAt(x, baseY, time){
   const swellPhase = x * 0.0048 + time * 0.183;
   const swell = Math.sin(swellPhase) + 0.22 * Math.sin(2 * swellPhase);
@@ -115,8 +119,9 @@ function drawScene(){
   ctx.fillStyle = bg;
   ctx.fillRect(0, 0, w, h);
 
-  // 2. Water surface baseline
-  const baseY = h * (0.25 + (1 - waterLevel) * 0.65);
+  // 2. Water surface baseline — uses the SAME vertical band as the ruler
+  //    waterLevel 1 = full (top of ruler), 0 = empty (bottom of ruler)
+  const baseY = h * (RULER_TOP + (1 - waterLevel) * RULER_SPAN);
 
   // 3. Water shape
   ctx.beginPath();
@@ -144,7 +149,6 @@ function drawScene(){
   ctx.save();
   ctx.clip();
 
-  // 5a. Soft glow band just below the surface
   const glow = ctx.createLinearGradient(0, baseY, 0, baseY + 380);
   glow.addColorStop(0,    "rgba(255,255,255,.36)");
   glow.addColorStop(0.08, "rgba(205,255,248,.28)");
@@ -153,7 +157,6 @@ function drawScene(){
   ctx.fillStyle = glow;
   ctx.fillRect(0, baseY - 20, w, 420);
 
-  // 5b. Drifting gradient blobs — slowly wandering shades of teal
   const depthRange = h - baseY;
   ctx.globalCompositeOperation = "screen";
   for (const b of blobs){
@@ -163,12 +166,10 @@ function drawScene(){
 
     const blobGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
     if (b.tone > 0.5){
-      // Brighter mint highlight
       blobGrad.addColorStop(0,    "rgba(190,255,235,0.11)");
       blobGrad.addColorStop(0.4,  "rgba(120,220,200,0.05)");
       blobGrad.addColorStop(1,    "rgba(0,0,0,0)");
     } else {
-      // Warmer, deeper-teal current
       blobGrad.addColorStop(0,    "rgba(80,210,180,0.10)");
       blobGrad.addColorStop(0.4,  "rgba(40,170,150,0.04)");
       blobGrad.addColorStop(1,    "rgba(0,0,0,0)");
@@ -178,7 +179,6 @@ function drawScene(){
   }
   ctx.globalCompositeOperation = "source-over";
 
-  // 5c. Particles
   for (const p of particles){
     let px = p.x0 * w + t * p.speedX;
     px = ((px % w) + w) % w;
@@ -251,6 +251,7 @@ function updateText(){
 
   document.getElementById("percent").innerText = `${remaining}% of day left`;
 
+  // waterLevel = fraction of total day remaining (1 = full, 0 = empty)
   const progress = Math.min(1, Math.max(0, (nowHours - dayStartHour) / totalDayHours));
   targetLevel = 1 - progress;
 }
@@ -258,23 +259,44 @@ function updateText(){
 function buildRuler(){
   const r = document.getElementById("ruler");
   r.innerHTML = "";
-  const hours = [15, 12, 9, 6, 3, 0];
   const h = innerHeight;
+  const totalDayHours = dayEndHour - dayStartHour;
 
-  for (let i = 0; i < hours.length; i++){
-    const y = (i / (hours.length - 1)) * (h * 0.75) + h * 0.12;
+  // Major ticks every 3 hours, from totalDayHours down to 0
+  const majorStep = 3;
+  const majorTicks = [];
+  for (let hr = Math.floor(totalDayHours / majorStep) * majorStep; hr >= 0; hr -= majorStep){
+    majorTicks.push(hr);
+  }
+  // Ensure 0 is included
+  if (majorTicks[majorTicks.length - 1] !== 0) majorTicks.push(0);
+  // Sort descending (most hours at top)
+  majorTicks.sort((a, b) => b - a);
+
+  for (let i = 0; i < majorTicks.length; i++){
+    const hrVal = majorTicks[i];
+    // Map hours remaining to Y: totalDayHours → top, 0 → bottom
+    const frac = 1 - hrVal / totalDayHours;   // 0 at top, 1 at bottom
+    const y = h * RULER_TOP + frac * h * RULER_SPAN;
 
     const tick = document.createElement("div");
     tick.className = "tick major";
     tick.style.top = y + "px";
-    tick.innerHTML = `<div class="label">${hours[i]}h</div><div class="line"></div>`;
+    tick.innerHTML = `<div class="label">${hrVal}h</div><div class="line"></div>`;
     r.appendChild(tick);
 
-    if (i < hours.length - 1){
-      for (let j = 1; j <= 2; j++){
+    // Minor ticks between this major and the next
+    if (i < majorTicks.length - 1){
+      const nextVal = majorTicks[i + 1];
+      const gap = hrVal - nextVal;
+      const minorCount = gap > 3 ? 2 : 2;
+      for (let j = 1; j <= minorCount; j++){
+        const mVal = hrVal - (gap * j / (minorCount + 1));
+        const mFrac = 1 - mVal / totalDayHours;
+        const my = h * RULER_TOP + mFrac * h * RULER_SPAN;
         const m = document.createElement("div");
         m.className = "tick";
-        m.style.top = (y + (j / 3) * ((h * 0.75) / (hours.length - 1))) + "px";
+        m.style.top = my + "px";
         m.innerHTML = '<div class="line"></div>';
         r.appendChild(m);
       }
@@ -291,6 +313,7 @@ document.body.addEventListener("click", () => {
   dayEndHour   = parseFloat(end);
   localStorage.setItem("dayStartHour", dayStartHour);
   localStorage.setItem("dayEndHour",   dayEndHour);
+  buildRuler();
   updateText();
 });
 
